@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Guarantee Application</title>
+    <link rel="stylesheet" href="front-end-styles.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>Guarantee Application</h1>
+    <form id="guaranteeForm">
+
+        <div class="form-section">
+            <h2>Customer Details</h2>
+            <div class="form-grid">
+                <div class="form-field"><label for="application_date">Application Date</label><input type="date" id="application_date" name="application_date" required></div>
+                <div class="form-field"><label for="customer_name">Customer Name</label><input type="text" id="customer_name" name="customer_name" required></div>
+                <div class="form-field"><label for="customer_telephone">Telephone</label><input type="tel" id="customer_telephone" name="customer_telephone" required></div>
+                <div class="form-field"><label for="customer_email">Email</label><input type="email" id="customer_email" name="customer_email" required></div>
+                <div class="form-field full-width"><label for="customer_postal_address">Postal Address</label><textarea id="customer_postal_address" name="customer_postal_address" required></textarea></div>
+                <div class="form-field full-width"><label for="customer_physical_address">Physical Address</label><textarea id="customer_physical_address" name="customer_physical_address" required></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Applicant Details (if different from Customer)</h2>
+            <div class="form-grid">
+                <div class="form-field"><label for="applicant_name">Applicant Name</label><input type="text" id="applicant_name" name="applicant_name" required></div>
+                <div class="form-field"><label for="applicant_relationship">Relationship to Customer</label><input type="text" id="applicant_relationship" name="applicant_relationship" required></div>
+                <div class="form-field"><label for="applicant_contact_name">Contact Person</label><input type="text" id="applicant_contact_name" name="applicant_contact_name" required></div>
+                <div class="form-field"><label for="applicant_contact_phone">Contact Phone</label><input type="tel" id="applicant_contact_phone" name="applicant_contact_phone" required></div>
+                <div class="form-field"><label for="applicant_contact_email">Contact Email</label><input type="email" id="applicant_contact_email" name="applicant_contact_email" required></div>
+                <div class="form-field full-width"><label for="applicant_postal_address">Postal Address</label><textarea id="applicant_postal_address" name="applicant_postal_address" required></textarea></div>
+                <div class="form-field full-width"><label for="applicant_physical_address">Physical Address</label><textarea id="applicant_physical_address" name="applicant_physical_address" required></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Beneficiary Details</h2>
+            <div class="form-grid">
+                <div class="form-field"><label for="beneficiary_name">Beneficiary Name</label><input type="text" id="beneficiary_name" name="beneficiary_name" required></div>
+                <div class="form-field"><label for="beneficiary_telephone">Telephone</label><input type="tel" id="beneficiary_telephone" name="beneficiary_telephone" required></div>
+                <div class="form-field full-width"><label for="beneficiary_postal_address">Postal Address</label><textarea id="beneficiary_postal_address" name="beneficiary_postal_address" required></textarea></div>
+                <div class="form-field full-width"><label for="beneficiary_physical_address">Physical Address</label><textarea id="beneficiary_physical_address" name="beneficiary_physical_address" required></textarea></div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Guarantee Details</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="guarantee_type">Type of Guarantee</label>
+                    <select id="guarantee_type" name="guarantee_type" required>
+                        <option value="">-- Select Type --</option>
+                        <option value="Bid Bond">Bid Bond</option>
+                        <option value="Performance Bond">Performance Bond</option>
+                        <option value="Advance Payment Guarantee">Advance Payment Guarantee</option>
+                        <option value="Payment Guarantee">Payment Guarantee</option>
+                        <option value="Retention Guarantee">Retention Guarantee</option>
+                        <option value="Warranty Bond">Warranty Bond</option>
+                        <option value="Customs Bond">Customs Bond</option>
+                        <option value="Transit Bond">Transit Bond</option>
+                        <option value="Lease Guarantee">Lease Guarantee</option>
+                        <option value="SBLC">SBLC</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-field"><label for="guarantee_purpose">Purpose of Guarantee</label><input type="text" id="guarantee_purpose" name="guarantee_purpose"></div>
+
+                <!-- Issuance fields moved directly under Type for better flow -->
+                <div class="form-field">
+                    <label for="issuance_manner">Manner of Issuance</label>
+                    <select id="issuance_manner" name="issuance_manner" required>
+                        <option value="">-- Select Manner --</option>
+                        <option value="Paper">Paper</option>
+                        <option value="SWIFT">SWIFT</option>
+                        <option value="Advise">Advise</option>
+                        <option value="Re-issue">Re-issue</option>
+                    </select>
+                </div>
+
+                <!-- Conditional Fields Container for Issuance -->
+                <div id="conditional-issuance-fields" class="full-width">
+                    <div id="advise-fields" class="form-grid hidden">
+                        <div class="form-field"><label for="first_advising_bank_swift_address">1st Advising Bank SWIFT</label><input type="text" id="first_advising_bank_swift_address" name="first_advising_bank_swift_address" maxlength="8" placeholder="8 characters"></div>
+                        <div class="form-field"><label for="second_advising_bank_swift_address">2nd Advising Bank SWIFT</label><input type="text" id="second_advising_bank_swift_address" name="second_advising_bank_swift_address" maxlength="8" placeholder="8 characters"></div>
+                    </div>
+                    <div id="re-issue-fields" class="form-grid hidden">
+                        <div class="form-field"><label for="reissuing_bank_swift_address">Re-issuing Bank SWIFT</label><input type="text" id="reissuing_bank_swift_address" name="reissuing_bank_swift_address" maxlength="8" placeholder="8 characters"></div>
+                    </div>
+                </div>
+
+                <!-- Separated Currency and Amount fields -->
+                <div class="form-field">
+                    <label for="guarantee_currency">Currency</label>
+                    <select id="guarantee_currency" name="guarantee_currency" required></select>
+                </div>
+                <div class="form-field">
+                    <label for="guarantee_amount">Amount</label>
+                    <input type="number" id="guarantee_amount" name="guarantee_amount" placeholder="e.g., 1250000.00" step="0.01" required>
+                </div>
+
+                <div class="form-field"><label for="local_guarantee_expiry_date">Term of Guarantee</label><input type="date" id="local_guarantee_expiry_date" name="local_guarantee_expiry_date"></div>
+                
+                <!-- Conditional field for Counter Guarantee Term -->
+                <div id="swift-fields" class="form-field full-width hidden">
+                    <label for="counter_guarantee_term">Term of Counter Guarantee (Calendar Days)</label>
+                    <input type="number" id="counter_guarantee_term" name="counter_guarantee_term" placeholder="e.g., 30">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Collateral</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="collateral_type">Collateral Options</label>
+                    <select id="collateral_type" name="collateral_type" required>
+                        <option value="">-- Select Option --</option>
+                        <option value="Limit/Facility">Limit/Facility</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Unsecured">Unsecured</option>
+                    </select>
+                </div>
+                <div id="cash-collateral-details" class="form-field full-width hidden">
+                    <div class="legal-text-block">
+                        <p>
+                            We expressly authorize the Bank to debit my/our account number
+                            <input type="text" name="collateral_account_number" class="inline-input" placeholder="Account Number">
+                            with the sum of <input type="text" name="collateral_sum" class="inline-input" placeholder="Collateral Sum">
+                            being cash collateral for the guarantee. This amount will be held by the Bank as security for the guarantee and will be released back into the said account immediately upon its cancellation.
+                        </p>
+                        <p>We understand that no interest shall accrue on the cash collateral and that it will be held in the sole name of and shall be the property of the Bank until such cancellation of the guarantee at which time we shall be entitled on demand made on that date to payment of the said amount.</p>
+                        <p>In the event the cash collateral provided under this clause is in a currency that is different from the currency of the guarantee being issued, we hereby expressly authorize the Bank to debit my/our above-mentioned nominated account with such additional sum as may be determined by the Bank at its sole direction, from time to time, as required margin to buffer the cash collateral against currency exchange rate fluctuations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Wording Format</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="wording_format">Options</label>
+                    <select id="wording_format" name="wording_format" required>
+                        <option value="">-- Select Format --</option>
+                        <option value="Stanbic Format">Stanbic Format</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div id="upload-wording-section" class="form-field hidden">
+                    <label for="wording_file">Upload Wording File</label>
+                    <input type="file" id="wording_file" name="wording_file" accept=".pdf,.doc,.docx,.txt">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Collection Details</h2>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="collect_trade_counter">Collect from Trade Counter?</label>
+                    <select id="collect_trade_counter" name="collect_trade_counter">
+                        <option value="">-- Select --</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </div>
+                <div class="form-field"><label for="collect_branch">Collection Branch</label><input type="text" id="collect_branch" name="collect_branch"></div>
+                <div class="form-field full-width"><label for="collect_agent_info">Agent Information for Collection</label><textarea id="collect_agent_info" name="collect_agent_info"></textarea></div>
+                <div class="form-field">
+                    <label for="identification_type">Agent ID Type</label>
+                    <select id="identification_type" name="identification_type">
+                        <option value="">-- Select ID Type --</option>
+                        <option value="National ID">National ID</option>
+                        <option value="Passport">Passport</option>
+                        <option value="Driver's License">Driver's License</option>
+                    </select>
+                </div>
+                <div class="form-field"><label for="identification_number">Agent ID Number</label><input type="text" id="identification_number" name="identification_number"></div>
+            </div>
+        </div>
+
+        <div class="submit-container">
+            <button type="submit">Submit Application</button>
+        </div>
+
+        <div id="formResponse"></div>
+    </form>
+</div>
+
+<script>
+    // --- DYNAMIC FORM LOGIC ---
+
+    const guaranteeTypeSelect = document.getElementById('guarantee_type');
+    const issuanceMannerSelect = document.getElementById('issuance_manner');
+    const currencySelect = document.getElementById('guarantee_currency');
+    const wordingFormatSelect = document.getElementById('wording_format');
+    const collateralTypeSelect = document.getElementById('collateral_type');
+
+    // Populate currency dropdown
+    async function populateCurrencies() {
+        try {
+            const response = await fetch('/currencies/');
+            if (!response.ok) {
+                throw new Error('Failed to load currencies from the server.');
+            }
+            const data = await response.json();
+            currencySelect.innerHTML = '<option value="">-- Select Currency --</option>';
+            data.currencies.forEach(currency => {
+                const option = new Option(`${currency.name} (${currency.code})`, currency.code);
+                currencySelect.add(option);
+            });
+        } catch (error) {
+            console.error("Error populating currencies:", error);
+            currencySelect.innerHTML = '<option value="">Error loading currencies</option>';
+        }
+    }
+
+    // Conditional logic for Issuance Manner
+    issuanceMannerSelect.addEventListener('change', function() {
+        const selectedManner = this.value;
+        const swiftFields = document.getElementById('swift-fields');
+        const adviseFields = document.getElementById('advise-fields');
+        const reIssueFields = document.getElementById('re-issue-fields');
+
+        // Hide all conditional fields first
+        swiftFields.classList.add('hidden');
+        adviseFields.classList.add('hidden');
+        reIssueFields.classList.add('hidden');
+
+        // Show the relevant fields based on selection
+        if (selectedManner === 'SWIFT') {
+            swiftFields.classList.remove('hidden');
+        } else if (selectedManner === 'Re-issue') {
+            reIssueFields.classList.remove('hidden');
+        } else if (selectedManner === 'Advise') {
+            adviseFields.classList.remove('hidden');
+        }
+    });
+
+    // Conditional logic for Wording Format
+    wordingFormatSelect.addEventListener('change', function() {
+        const uploadSection = document.getElementById('upload-wording-section');
+        if (this.value === 'Other') {
+            uploadSection.classList.remove('hidden');
+        } else {
+            uploadSection.classList.add('hidden');
+        }
+    });
+
+    // Conditional logic for Collateral
+    collateralTypeSelect.addEventListener('change', function() {
+        const cashDetails = document.getElementById('cash-collateral-details');
+        if (this.value === 'Cash') {
+            cashDetails.classList.remove('hidden');
+        } else {
+            cashDetails.classList.add('hidden');
+        }
+    });
+
+
+    // --- INITIALIZATION ---
+    populateCurrencies();
+
+    // --- FORM SUBMISSION LOGIC ---
+
+    document.getElementById('guaranteeForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        // Add a confirmation dialog before submitting
+        if (!confirm("Are you sure you want to submit this application?")) {
+            return; // Stop the submission if the user clicks "Cancel"
+        }
+
+        const form = event.target;
+        const formData = new FormData(form);
+        const responseDiv = document.getElementById('formResponse');
+
+        responseDiv.textContent = 'Submitting...';
+        responseDiv.className = '';
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/submit-guarantee/', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                responseDiv.textContent = `✅ Submission successful! Reference No: ${result.reference_no}`;
+                responseDiv.className = 'response-success';
+                form.reset();
+            } else {
+                // Attempt to parse error from FastAPI
+                let errorMessage = 'An error occurred.';
+                if (result.detail) {
+                    if (Array.isArray(result.detail)) {
+                        errorMessage = result.detail.map(e => `${e.loc.join(' -> ')}: ${e.msg}`).join('; ');
+                    } else {
+                        errorMessage = result.detail;
+                    }
+                }
+                throw new Error(errorMessage);
+            }
+        } catch (error) {
+            responseDiv.textContent = `❌ Error: ${error.message}`;
+            responseDiv.className = 'response-error';
+        }
+    });
+</script>
+
+</body>
+
+</html>
