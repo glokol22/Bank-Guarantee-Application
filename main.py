@@ -1,16 +1,48 @@
 print("✅ Loaded main.py from:", __file__)
 
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, Form, status
+from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import os
 import uuid
 from datetime import datetime
 import httpx
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from datetime import timedelta
+from typing import Optional
+from typing_extensions import Annotated
+from pymongo import MongoClient
 
-app = FastAPI()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Code to run on startup
+    print("INFO:     Application startup complete.")
+    # --- MongoDB Setup ---
+    MONGO_URI = "mongodb://localhost:27017/"
+    client = MongoClient(MONGO_URI)
+    db = client.gtee_db
+    app.state.user_collection = db.users
+
+    # Seed data
+    if app.state.user_collection.count_documents({}) == 0:
+        app.state.user_collection.insert_one({
+            "username": "admin",
+            "full_name": "Admin User",
+            "email": "admin@example.com",
+            "hashed_password": pwd_context.hash("password123"),
+            "disabled": False,
+        })
+        print("✅ Default user 'admin' seeded in MongoDB.")
+    yield
+    # Code to run on shutdown
+    client.close()
+
+app = FastAPI(lifespan=lifespan)
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +58,69 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # In-memory storage for submissions
 submissions = []
+
+# --- Security & Authentication Setup ---
+
+SECRET_KEY = os.urandom(32).hex()  # In a real app, load this from a config file
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_user(username: str):
+    return app.state.user_collection.find_one({"username": username})
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user_from_cookie(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = get_user(username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+@app.post("/token")
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = get_user(form_data.username)
+    if not user or not verify_password(form_data.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    
+    # Return a JSON response and set the token in an HTTPOnly cookie for security
+    response = JSONResponse(content={"message": "Login successful"})
+    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    return response
+
 
 # --- API Endpoints ---
 
@@ -74,7 +169,7 @@ async def submit_guarantee(
     reissuing_bank_swift_address: str = Form(None),
     first_advising_bank_swift_address: str = Form(None),
     second_advising_bank_swift_address: str = Form(None), 
-    guarantee_currency: str = Form(...), 
+    guarantee_currency: str = Form(...),
     guarantee_amount: str = Form(...),
     collateral_type: str = Form(...),
     collateral_account_number: str = Form(None),
@@ -90,10 +185,10 @@ async def submit_guarantee(
     identification_number: str = Form(None),
     wording_file: UploadFile = None,
     status: str = Form("Draft")  # Default status
+    # current_user: dict = Depends(get_current_user_from_cookie) # This protects the endpoint
 ):
     ref_no = f"GUA-{uuid.uuid4().hex[:8].upper()}"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     file_path = None
     if wording_file:
         filename = f"{ref_no}_{wording_file.filename}"
@@ -118,7 +213,7 @@ async def submit_guarantee(
         "applicant_contact_phone": applicant_contact_phone,
         "applicant_contact_email": applicant_contact_email,
         "beneficiary_name": beneficiary_name,
-        "beneficiary_postal_address": beneficiary_postal_address, 
+        "beneficiary_postal_address": beneficiary_postal_address,
         "beneficiary_physical_address": beneficiary_physical_address,
         "beneficiary_telephone": beneficiary_telephone,
         "issuance_manner": issuance_manner,
@@ -128,7 +223,7 @@ async def submit_guarantee(
         "reissuing_bank_swift_address": reissuing_bank_swift_address,
         "first_advising_bank_swift_address": first_advising_bank_swift_address,
         "second_advising_bank_swift_address": second_advising_bank_swift_address,
-        "guarantee_currency": guarantee_currency, 
+        "guarantee_currency": guarantee_currency,
         "guarantee_amount": guarantee_amount,
         "collateral_type": collateral_type,
         "collateral_account_number": collateral_account_number,
