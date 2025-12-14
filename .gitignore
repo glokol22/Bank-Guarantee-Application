@@ -1,5 +1,10 @@
-venv/
+# Python specific files and directories
 __pycache__/
-uploads/
-.env
 *.pyc
+
+# Virtual Environment
+venv/
+.venv/
+
+# Uploaded Files / Temporary Data
+uploads/
