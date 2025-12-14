@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+@keyframes gradientAnimation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #eef2f3, #dfe9f3, #d6e4f0, #dfe9f3);
+    background-size: 400% 400%;
+    animation: gradientAnimation 18s ease infinite;
+    color: #343a40;
+}
+
+.login-container {
+    background-color: #ffffff;
+    padding: 40px 50px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 40, 100, 0.12);
+    width: 100%;
+    max-width: 400px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    font-weight: 700;
+    color: #003366;
+    font-size: 2em;
+}
+
+.form-field {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #4a5568;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 1em;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.15);
+    outline: none;
+}
+
+button[type="submit"] {
+    width: 100%;
+    background-color: #003366;
+    color: white;
+    border: none;
+    padding: 14px 30px;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 51, 102, 0.15);
+    margin-top: 10px;
+}
+
+button[type="submit"]:hover {
+    background-color: #004a8d;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 74, 141, 0.25);
+}
+
+#loginResponse {
+    margin-top: 20px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1em;
+}
+
+.response-success { color: #155724; }
+.response-error { color: #721c24; }

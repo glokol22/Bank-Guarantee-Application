@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Guarantee Application</title>
+    <link rel="stylesheet" href="login-styles.css">
+</head>
+<body>
+    <div class="login-container">
+        <form id="loginForm">
+            <h1>Application Login</h1>
+            <div class="form-field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            <div class="form-field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit">Login</button>
+            <div id="loginResponse"></div>
+        </form>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const form = event.target;
+            // FastAPI's OAuth2PasswordRequestForm expects URL-encoded data
+            const formData = new URLSearchParams();
+            formData.append('username', form.username.value);
+            formData.append('password', form.password.value);
+
+            const responseDiv = document.getElementById('loginResponse');
+            responseDiv.textContent = 'Logging in...';
+            responseDiv.className = '';
+
+            try {
+                const response = await fetch('/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    // On success, redirect to the main application
+                    window.location.href = '/front-end.html';
+                } else {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.detail || 'Invalid credentials');
+                }
+            } catch (error) {
+                responseDiv.textContent = `❌ Error: ${error.message}`;
+                responseDiv.className = 'response-error';
+            }
+        });
+    </script>
+</body>
+</html>
