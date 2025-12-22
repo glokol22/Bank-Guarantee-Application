@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - GTEE</title>
+    <link rel="stylesheet" href="front-end-styles.css">
+    <style>
+        /* Specific overrides for the admin dashboard */
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .back-link {
+            text-decoration: none;
+            color: #003366;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #003366;
+            font-weight: 600;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .role-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .role-ADMIN { background-color: #e0e7ff; color: #3730a3; }
+        .role-MAKER { background-color: #dcfce7; color: #166534; }
+        .role-CHECKER { background-color: #fef9c3; color: #854d0e; }
+    </style>
+</head>
+<body>
+
+<div class="profile-bar hidden" id="profileBar">
+    <div class="user-info">
+        <span class="user-icon">👤</span>
+        <span id="userName">Loading...</span>
+    </div>
+    <button id="logoutBtn" class="logout-btn">Sign Out</button>
+</div>
+
+<div class="container">
+    <div class="admin-header">
+        <h1>Admin Dashboard</h1>
+    </div>
+
+    <div class="form-section">
+        <h2>Create New User</h2>
+        <form id="createUserForm">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="role">Role</label>
+                    <select id="role" name="role" required>
+                        <option value="">-- Select Role --</option>
+                        <option value="MAKER">MAKER (Creator)</option>
+                        <option value="CHECKER">CHECKER (Authorizer)</option>
+                        <option value="ADMIN">ADMIN (System)</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-field">
+                    <label for="full_name">Full Name</label>
+                    <input type="text" id="full_name" name="full_name" required>
+                </div>
+                <div class="form-field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+            </div>
+            <div class="submit-container">
+                <button type="submit">Create User</button>
+            </div>
+            <div id="formResponse"></div>
+        </form>
+    </div>
+
+    <div class="form-section">
+        <h2>Recently Created Users (Last 2)</h2>
+        <div class="table-responsive">
+            <table id="usersTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="text-center">Loading users...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function loadUsers() {
+        try {
+            const response = await fetch('/users/');
+            if (response.ok) {
+                const data = await response.json();
+                const tbody = document.querySelector('#usersTable tbody');
+                tbody.innerHTML = '';
+                data.users.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${user.full_name}</td>
+                        <td>${user.email}</td>
+                        <td><span class="role-badge role-${user.role}">${user.role}</span></td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                // If unauthorized, redirect to login or home
+                if (response.status === 403) {
+                    alert("Access Denied: You must be an ADMIN to view this page.");
+                    window.location.href = 'front-end.html';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading users:', error);
+        }
+    }
+
+    document.getElementById('createUserForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        const responseDiv = document.getElementById('formResponse');
+
+        try {
+            const response = await fetch('/users/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                responseDiv.textContent = result.message;
+                responseDiv.className = 'response-success';
+                e.target.reset();
+                loadUsers(); // Refresh list
+            } else {
+                throw new Error(result.detail || 'Failed to create user');
+            }
+        } catch (error) {
+            responseDiv.textContent = `❌ Error: ${error.message}`;
+            responseDiv.className = 'response-error';
+        }
+    });
+
+    // Auth Check
+    async function checkAuth() {
+        try {
+            const response = await fetch('/users/me');
+            if (response.ok) {
+                const user = await response.json();
+                document.getElementById('userName').textContent = user.full_name;
+                document.getElementById('profileBar').classList.remove('hidden');
+                if (user.role !== 'ADMIN') {
+                    alert("Access Denied: Admin privileges required.");
+                    window.location.href = 'front-end.html';
+                } else {
+                    loadUsers();
+                }
+            } else {
+                window.location.href = 'login.html';
+            }
+        } catch (e) {
+            window.location.href = 'login.html';
+        }
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await fetch('/logout', { method: 'POST' });
+            window.location.href = 'login.html';
+        } catch (error) {
+            console.error('Logout failed', error);
+        }
+    });
+
+    checkAuth();
+</script>
+</body>
+</html>

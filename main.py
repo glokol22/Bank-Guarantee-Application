@@ -1,6 +1,6 @@
 print("✅ Loaded main.py from:", __file__)
 
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, Form, status
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, Form, status, Cookie
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,12 +11,14 @@ import uuid
 from datetime import datetime
 import httpx
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from datetime import timedelta
 from typing import Optional
 from typing_extensions import Annotated
 from pymongo import MongoClient
+from pydantic import BaseModel
 
+from config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,17 +27,22 @@ async def lifespan(app: FastAPI):
     # --- MongoDB Setup ---
     MONGO_URI = "mongodb://localhost:27017/"
     client = MongoClient(MONGO_URI)
-    db = client.gtee_db
-    app.state.user_collection = db.users
+    db = client.users_db
+    # Separate collections for different user categories
+    app.state.admins = db.admin_db
+    app.state.makers = db.maker_db
+    app.state.checkers = db.auth_db
+    app.state.submission_collection = db.submissions
 
     # Seed data
-    if app.state.user_collection.count_documents({}) == 0:
-        app.state.user_collection.insert_one({
+    if app.state.admins.count_documents({}) == 0:
+        app.state.admins.insert_one({
             "username": "admin",
             "full_name": "Admin User",
             "email": "admin@example.com",
-            "hashed_password": pwd_context.hash("password123"),
+            "hashed_password": hash_password("password123"),
             "disabled": False,
+            "role": "ADMIN", # Default role for the bootstrap user
         })
         print("✅ Default user 'admin' seeded in MongoDB.")
     yield
@@ -56,23 +63,25 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# In-memory storage for submissions
-submissions = []
-
 # --- Security & Authentication Setup ---
 
-SECRET_KEY = os.urandom(32).hex()  # In a real app, load this from a config file
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 def get_user(username: str):
-    return app.state.user_collection.find_one({"username": username})
+    # Search for the user across the categorized collections
+    user = app.state.admins.find_one({"username": username})
+    if user: return user
+    user = app.state.makers.find_one({"username": username})
+    if user: return user
+    user = app.state.checkers.find_one({"username": username})
+    if user: return user
+    return None
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -81,17 +90,24 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-async def get_current_user_from_cookie(token: str = Depends(oauth2_scheme)):
+async def get_current_user_from_cookie(access_token: Optional[str] = Cookie(None)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not access_token:
+        raise credentials_exception
+    
+    token = access_token
+    if token.startswith("Bearer "):
+        token = token.split(" ")[1]
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -111,16 +127,102 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user["username"]}, expires_delta=access_token_expires
     )
     
     # Return a JSON response and set the token in an HTTPOnly cookie for security
-    response = JSONResponse(content={"message": "Login successful"})
+    response = JSONResponse(content={
+        "message": "Login successful",
+        "user": {
+            "full_name": user.get("full_name", user["username"]),
+            "role": user.get("role", "MAKER") # Return the role to the frontend
+        }
+    })
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
     return response
 
+
+@app.get("/users/me")
+async def read_users_me(current_user: dict = Depends(get_current_user_from_cookie)):
+    return {
+        "username": current_user["username"],
+        "full_name": current_user.get("full_name", "User"),
+        "email": current_user.get("email", ""),
+        "role": current_user.get("role", "MAKER")
+    }
+
+@app.post("/logout")
+async def logout():
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    response.delete_cookie("access_token")
+    return response
+
+# --- User Management Endpoints (Admin Only) ---
+
+class UserCreate(BaseModel):
+    username: str
+    full_name: str
+    email: str
+    password: str
+    role: str
+
+@app.post("/users/")
+async def create_user_endpoint(user: UserCreate, current_user: dict = Depends(get_current_user_from_cookie)):
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=403, detail="Not authorized. Admin access required.")
+    
+    if get_user(user.username):
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    user_doc = {
+        "username": user.username,
+        "full_name": user.full_name,
+        "email": user.email,
+        "role": user.role,
+        "hashed_password": hash_password(user.password),
+        "disabled": False
+    }
+
+    if user.role == "ADMIN":
+        app.state.admins.insert_one(user_doc)
+    elif user.role == "MAKER":
+        app.state.makers.insert_one(user_doc)
+    elif user.role == "CHECKER":
+        app.state.checkers.insert_one(user_doc)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid role specified.")
+    
+    return {"message": f"User {user.username} created successfully"}
+
+@app.get("/users/")
+async def list_users(current_user: dict = Depends(get_current_user_from_cookie)):
+    if current_user.get("role") != "ADMIN":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    users = []
+    # Fetch from all collections
+    # We include _id temporarily to sort by creation time
+    for u in app.state.admins.find({}, {"hashed_password": 0}):
+        u["role"] = "ADMIN"
+        users.append(u)
+    for u in app.state.makers.find({}, {"hashed_password": 0}):
+        u["role"] = "MAKER"
+        users.append(u)
+    for u in app.state.checkers.find({}, {"hashed_password": 0}):
+        u["role"] = "CHECKER"
+        users.append(u)
+    
+    # Sort by _id descending (newest first) and take only the top 2
+    users.sort(key=lambda x: x["_id"], reverse=True)
+    users = users[:2]
+
+    # Remove _id before returning to frontend
+    for u in users:
+        del u["_id"]
+
+    return {"users": users}
 
 # --- API Endpoints ---
 
@@ -241,7 +343,7 @@ async def submit_guarantee(
         "status": status
     }
 
-    submissions.append(submission)
+    app.state.submission_collection.insert_one(submission)
 
     return {
         "reference_no": ref_no,
@@ -253,12 +355,13 @@ async def submit_guarantee(
 
 @app.get("/submissions/")
 def get_submissions():
+    submissions = list(app.state.submission_collection.find({}, {"_id": 0}))
     return {"submissions": submissions}
 
 @app.get("/submissions/{customer_name}")
 def get_customer_summary(customer_name: str):
     """Returns summary of guarantees per status for a given customer"""
-    customer_records = [s for s in submissions if s["customer_name"].lower() == customer_name.lower()]
+    customer_records = list(app.state.submission_collection.find({"customer_name": {"$regex": f"^{customer_name}$", "$options": "i"}}, {"_id": 0}))
     summary = {
         "Issued": 0,
         "Draft": 0,
@@ -283,7 +386,8 @@ def get_customer_summary(customer_name: str):
 def list_customers():
     """Returns all customers with their summaries"""
     customers = {}
-    for s in submissions:
+    submissions_cursor = app.state.submission_collection.find({}, {"_id": 0})
+    for s in submissions_cursor:
         name = s["customer_name"]
         if name not in customers:
             customers[name] = {
@@ -306,7 +410,7 @@ def list_customers():
 
 @app.get("/download/{ref_no}")
 def download_file(ref_no: str):
-    submission = next((s for s in submissions if s["reference_no"] == ref_no), None)
+    submission = app.state.submission_collection.find_one({"reference_no": ref_no})
     if submission and submission["file_path"] and os.path.exists(submission["file_path"]):
         return FileResponse(submission["file_path"], filename=os.path.basename(submission["file_path"]))
     return {"error": "File not found or submission does not exist."}

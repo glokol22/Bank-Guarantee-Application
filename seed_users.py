@@ -1,44 +1,121 @@
 from pymongo import MongoClient
-from passlib.context import CryptContext
+import bcrypt
+import getpass
 
 # --- Configuration ---
-# This should match the settings in your main.py
 MONGO_URI = "mongodb://localhost:27017/"
-DB_NAME = "gtee_db"
-USER_COLLECTION = "users"
+DB_NAME = "users_db"
 
-# --- User Data ---
-# Add as many users as you need to this list
-users_to_create = [
-    {"username": "user1", "full_name": "Test User One", "email": "user1@example.com", "password": "password123"},
-    {"username": "user2", "full_name": "Test User Two", "email": "user2@example.com", "password": "password456"},
-    {"username": "manager", "full_name": "Manager Account", "email": "manager@example.com", "password": "securepassword"},
-    # Add more user dictionaries here
-]
+# --- Role Definitions ---
+ROLE_MAKER = "MAKER"
+ROLE_CHECKER = "CHECKER"
+ROLE_ADMIN = "ADMIN"
 
-def seed_bulk_users():
-    """Connects to MongoDB, hashes passwords, and inserts multiple users."""
+def hash_password(password: str) -> str:
+    """Hashes a password using bcrypt."""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def get_collection_by_role(db, role):
+    if role == ROLE_ADMIN:
+        return db.admin_db
+    elif role == ROLE_MAKER:
+        return db.maker_db
+    elif role == ROLE_CHECKER:
+        return db.auth_db
+    return None
+
+def check_user_exists(db, username):
+    """Checks if a username exists in any of the user collections."""
+    if db.admin_db.find_one({"username": username}): return True
+    if db.maker_db.find_one({"username": username}): return True
+    if db.auth_db.find_one({"username": username}): return True
+    return False
+
+def create_user(db, role, username, full_name, email, password):
+    """Reusable function to create a single user."""
+    if check_user_exists(db, username):
+        print(f"❌ User '{username}' already exists in the database.")
+        return
+
+    hashed_pw = hash_password(password)
+    user_doc = {
+        "username": username,
+        "full_name": full_name,
+        "email": email,
+        "hashed_password": hashed_pw,
+        "role": role,
+        "disabled": False
+    }
+    
+    collection = get_collection_by_role(db, role)
+    collection.insert_one(user_doc)
+    print(f"✅ Successfully created {role} user: {username}")
+
+def interactive_user_creation():
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    collection = db[USER_COLLECTION]
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-    print(f"Connecting to MongoDB and preparing to seed {len(users_to_create)} users...")
+    print("\n=== GTEE User Management System ===")
+    print("This tool allows you to create users in the backend database without writing code.")
+    
+    while True:
+        print("\nOptions:")
+        print("1. Create New User")
+        print("2. List All Users")
+        print("3. Exit")
+        
+        choice = input("\nEnter choice (1-3): ").strip()
+        
+        if choice == '1':
+            print("\n--- Create New User ---")
+            print("Select Role Category:")
+            print(f"1. {ROLE_ADMIN} (Back-end/System)")
+            print(f"2. {ROLE_MAKER} (Creator)")
+            print(f"3. {ROLE_CHECKER} (Authorizer)")
+            
+            role_choice = input("Enter role number: ").strip()
+            role = None
+            if role_choice == '1': role = ROLE_ADMIN
+            elif role_choice == '2': role = ROLE_MAKER
+            elif role_choice == '3': role = ROLE_CHECKER
+            else:
+                print("❌ Invalid role selection.")
+                continue
 
-    for user_data in users_to_create:
-        # Check if user already exists
-        if collection.find_one({"username": user_data["username"]}):
-            print(f"User '{user_data['username']}' already exists. Skipping.")
-            continue
-
-        # Hash the password and prepare the document for insertion
-        hashed_password = pwd_context.hash(user_data.pop("password"))
-        user_document = {**user_data, "hashed_password": hashed_password, "disabled": False}
-        collection.insert_one(user_document)
-        print(f"Successfully created user: '{user_data['username']}'")
+            username = input("Username: ").strip()
+            if not username:
+                print("❌ Username cannot be empty.")
+                continue
+                
+            full_name = input("Full Name: ").strip()
+            email = input("Email: ").strip()
+            password = getpass.getpass("Password: ")
+            confirm_password = getpass.getpass("Confirm Password: ")
+            
+            if password != confirm_password:
+                print("❌ Passwords do not match.")
+                continue
+            
+            create_user(db, role, username, full_name, email, password)
+            
+        elif choice == '2':
+            print("\n--- Existing Users ---")
+            print(f"[{ROLE_ADMIN}S]")
+            for u in db.admin_db.find(): print(f" - {u['username']} ({u.get('full_name', '')})")
+            
+            print(f"\n[{ROLE_MAKER}S]")
+            for u in db.maker_db.find(): print(f" - {u['username']} ({u.get('full_name', '')})")
+            
+            print(f"\n[{ROLE_CHECKER}S]")
+            for u in db.auth_db.find(): print(f" - {u['username']} ({u.get('full_name', '')})")
+            
+        elif choice == '3':
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice.")
 
     client.close()
-    print("Seeding process complete.")
 
 if __name__ == "__main__":
-    seed_bulk_users()
+    interactive_user_creation()

@@ -8,6 +8,15 @@
 </head>
 <body>
 
+<div class="profile-bar hidden" id="profileBar">
+    <div class="user-info">
+        <span class="user-icon">👤</span>
+        <span id="userName">Loading...</span>
+    </div>
+    <a id="adminLink" href="admin.html" class="admin-dashboard-link hidden">Admin Dashboard</a>
+    <button id="logoutBtn" class="logout-btn">Sign Out</button>
+</div>
+
 <div class="container">
     <h1>Guarantee Application</h1>
     <form id="guaranteeForm">
@@ -266,6 +275,49 @@
     // --- INITIALIZATION ---
     populateCurrencies();
 
+    // --- AUTHENTICATION LOGIC ---
+    async function checkLoginStatus() {
+        // Instantly display the user's name from session storage to remove perceived lag
+        const storedUserName = sessionStorage.getItem('userName');
+        if (storedUserName) {
+            document.getElementById('userName').textContent = storedUserName;
+            document.getElementById('profileBar').classList.remove('hidden');
+        }
+
+        // The sidebar is visible by default on page load to show loading state
+        try {
+            const response = await fetch('/users/me');
+            if (response.ok) {
+                const userData = await response.json();
+                document.getElementById('userName').textContent = userData.full_name || userData.username;
+                document.getElementById('profileBar').classList.remove('hidden');
+                // Show Admin Link if user is ADMIN
+                if (userData.role === 'ADMIN') {
+                    document.getElementById('adminLink').classList.remove('hidden');
+                }
+                // Clear the temporary name now that we have the real one
+                sessionStorage.removeItem('userName');
+            } else {
+                // Redirect to login if not authenticated
+                window.location.href = 'login.html';
+            }
+        } catch (error) {
+            console.error('Auth check failed', error);
+            window.location.href = 'login.html';
+        }
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try {
+            await fetch('/logout', { method: 'POST' });
+            window.location.href = 'login.html';
+        } catch (error) {
+            console.error('Logout failed', error);
+        }
+    });
+
+    checkLoginStatus();
+
     // --- FORM SUBMISSION LOGIC ---
 
     document.getElementById('guaranteeForm').addEventListener('submit', async function(event) {
@@ -284,7 +336,7 @@
         responseDiv.className = '';
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/submit-guarantee/', {
+            const response = await fetch('/submit-guarantee/', {
                 method: 'POST',
                 body: formData,
             });

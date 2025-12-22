@@ -8,3 +8,11 @@ venv/
 
 # Uploaded Files / Temporary Data
 uploads/
+
+# IDE / Editor specific files
+.vscode/
+.idea/
+
+# Environment variables
+.env
+*.env

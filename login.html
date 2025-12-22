@@ -8,17 +8,23 @@
 </head>
 <body>
     <div class="login-container">
+        <div class="login-header">
+            <div class="login-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h1>Guarantee Portal</h1>
+            <p class="subtitle">Please sign in to continue</p>
+        </div>
         <form id="loginForm">
-            <h1>Application Login</h1>
             <div class="form-field">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autocomplete="username">
+                <input type="text" id="username" name="username" required autocomplete="username" placeholder="Enter your username">
             </div>
             <div class="form-field">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
+                <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="Enter your password">
             </div>
-            <button type="submit">Login</button>
+            <button type="submit">Sign In</button>
             <div id="loginResponse"></div>
         </form>
     </div>
@@ -43,8 +49,17 @@
                 });
 
                 if (response.ok) {
-                    // On success, redirect to the main application
-                    window.location.href = '/front-end.html';
+                    const result = await response.json();
+                    // Store the user's full name from the response to avoid lag
+                    const userName = result.user.full_name || form.username.value;
+                    sessionStorage.setItem('userName', userName);
+                    
+                    // Redirect based on role
+                    if (result.user.role === 'ADMIN') {
+                        window.location.href = '/admin.html';
+                    } else {
+                        window.location.href = '/front-end.html';
+                    }
                 } else {
                     const errorResult = await response.json();
                     throw new Error(errorResult.detail || 'Invalid credentials');
